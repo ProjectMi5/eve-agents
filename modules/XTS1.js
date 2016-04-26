@@ -1,6 +1,6 @@
 "use strict";
 
-const config = require('./../../config.js');
+const config = require('./../config.js');
 
 const _ = require('lodash');
 const babble = require('babble');
@@ -9,7 +9,7 @@ const Promise = require('bluebird');
 const uuid = require('uuid-v4');
 const co = require('co');
 const retry = require('co-retry');
-let GeneralAgent = require('./../../agents/GeneralAgent');
+let GeneralAgent = require('./../agents/GeneralAgent');
 
 const agentOptions = {
   id: 'HandlingRobot'+uuid(),
@@ -18,7 +18,6 @@ const agentOptions = {
     {
       type: 'amqp',
       url: config.amqpHost
-      //host: 'dev.rabbitmq.com'
     }
   ],
   mqtt: config.mqttHost
@@ -26,25 +25,63 @@ const agentOptions = {
 
 let Agent = new GeneralAgent(agentOptions);
 
-// discrete Positions that the Handling Robot can reach
-Agent.positions = [1,5,10,15,20,30,40,50,70,80,90,99];
+const Container = function() {
+  this.status = 'unreserved';
+
+  this.reserve = function(){
+    this.status = 'reserved';
+  };
+  this.block = function(){
+    this.status = 'blocked';
+  };
+  this.unreserve = function(){
+    this.status = 'unreserved';
+  };
+  this.unblock = function(){
+    this.status = 'reserved';
+  };
+
+  this.isFree = function(){
+    return (this.status === 'unreserved');
+  };
+  this.isReserved = function(){
+    return (this.status === 'reserved');
+  };
+  this.isBlocked = function(){
+    return (this.status === 'blocked');
+  }
+};
+let Mover = new Container();
 Agent.taskList = [];
 
 Agent.move = function(position){
   return new Promise( (resolve, reject) => {
-    // if position can be reached
-    if ( _.indexOf(Agent.positions, position) != -1 ) {
-      console.log('!!!!!!!!!!!!!! ==== moving... 0s');
-
-      Agent.timer.setTimeout(resolve, 0);
-    } else {
-      reject({err: 'position cannot be reached'});
-    }
+    Agent.timer.setTimeout(resolve, 0);
   });
 };
 
 Promise.all([Agent.ready]).then(function () {
   Agent.events.on('registered',console.log);
+
+  Agent.serviceAddCAcfpParticipant('cfp-reserveContainer', calcReservation, reserveContainer);
+  function calcReservation (message, context) {
+    return new Promise((resolve, reject) => {
+      if (Mover.isFree()) {
+        resolve({propose: {price: 0.1}});
+      } else {
+        resolve({refuse: `containerStatus is ${Container.status}`});
+      }
+    });
+  }
+  function reserveContainer (message, context) {
+    return new Promise((resolve, reject) => {
+      if (Mover.isFree()) {
+        resolve({inform: `Mover is now reserved`});
+      } else {
+        resolve({failure: `Mover needs to be reserved first. It now is ${Mover.status}`});
+      }
+    });
+  }
 
   Agent.serviceAddCAcfpParticipant('cfp-transport', calculatePrice, reserveTransport);
   Agent.register();
@@ -60,7 +97,6 @@ Promise.all([Agent.ready]).then(function () {
       }
     });
   }
-  //Agent.events.on('dispatch', dispatch);
   function reserveTransport (message, context) {
     return new Promise((resolve, reject) => {
       develop('reserveTransport', message, context);
@@ -79,8 +115,6 @@ Promise.all([Agent.ready]).then(function () {
         };
         Agent.taskList.push(task);
         develop('task is now in tasklist:', Agent.taskList);
-        //Agent.events.emit('dispatch', task);
-        //develop('dispatched!');
         resolve({inform: task});
       }
     });

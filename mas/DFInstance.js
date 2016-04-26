@@ -2,11 +2,11 @@
 
 process.env.DEBUG = 'develop';
 
-const config = require('./config.js');
+const config = require('./../config.js');
 
 const develop = require('debug')('develop');
 const Promise = require('bluebird');
-let DFAgent = require('./agents/DFAgent');
+let DFAgent = require('./../agents/DFAgent');
 
 const options = {
   id: config.DF, // TODO find out, why on localhost DF is now blocked?

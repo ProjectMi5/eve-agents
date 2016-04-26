@@ -1,13 +1,13 @@
 "use strict";
 
-const config = require('./../../config.js');
+const config = require('./../config.js');
 
 const _ = require('lodash');
 const babble = require('babble');
 const develop = require('debug')('develop');
 const Promise = require('bluebird');
 const uuid = require('uuid-v4');
-let GeneralAgent = require('./../../agents/GeneralAgent');
+let GeneralAgent = require('./../agents/GeneralAgent');
 
 const agentOptions = {
   id: 'BottleOutput'+uuid(),
@@ -16,7 +16,6 @@ const agentOptions = {
     {
       type: 'amqp',
       url: config.amqpHost
-      //host: 'dev.rabbitmq.com'
     }
   ],
   mqtt: config.mqttHost

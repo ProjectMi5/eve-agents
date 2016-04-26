@@ -1,6 +1,6 @@
 "use strict";
 
-const config = require('./../../config.js');
+const config = require('./../config.js');
 
 const _ = require('lodash');
 const babble = require('babble');
@@ -13,7 +13,7 @@ const Promise = require('bluebird');
 const co = require('co');
 const retry = require('co-retry');
 const uuid = require('uuid-v4');
-let GeneralAgent = require('./../../agents/GeneralAgent');
+let GeneralAgent = require('./../agents/GeneralAgent');
 
 var agentOptions = {
   id: 'Order'+uuid(),
@@ -40,16 +40,12 @@ Promise.all([Agent.ready]).then(function () {
   order.orderId = uuid();
   order.recipe = [
     {
-      service: 'bottleInput',
-      parameters: {
-        bottleType: 'longneck', size: 300
-      }
+      service: 'reserveContainer',
+      parameters: {},
     },
     {
-      service: 'print',
-      execute: true,
+      service: 'bottleInput',
       parameters: {
-        logo: '1.gif',
         bottleType: 'longneck', size: 300
       }
     },
@@ -118,14 +114,26 @@ Promise.all([Agent.ready]).then(function () {
     return cfpMinPrice('cfp-transport', {parameters: edge});
   }
 
+  /**
+   * compute the edges as a travel route
+   *
+   * if one agent is itself (handling robot) it is omitted, since reserving containers is like
+   * a virtual service
+   *
+   * @param agents
+   */
   function computeEdges (agents) {
     let edges = [];
     for (let i = 0; i < agents.length; i++) {
       let edge = {};
       edge.from = agents[i];
       edge.to = agents[i+1];
-      if( edge.to ) {
-        edges.push(edge);
+      // Check if none of the agent is a Handling
+      if (edge.from.agent.search('Handling') === -1) {
+        if (edge.)
+        if( edge.to) {
+          edges.push(edge);
+        }
       }
     }
     return edges;

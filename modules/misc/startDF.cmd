@@ -1,3 +1,3 @@
 @ECHO OFF
-ECHO This script will start a prodcution-plant example (Rabbit-MQ needed)
-START "DF" nodemon --watch ./../../DFInstance.js ./../../DFInstance.js
+ECHO This script will start the DF (Rabbit-MQ needed)
+START "DF" nodemon --watch ./../../mas/DFInstance.js ./../../mas/DFInstance.js

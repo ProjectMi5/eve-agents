@@ -1,22 +1,21 @@
 "use strict";
 
-const config = require('./../../config.js');
+const config = require('./../config.js');
 
 const _ = require('lodash');
 const develop = require('debug')('develop');
 const Promise = require('bluebird');
 const uuid = require('uuid-v4');
 const co = require('co');
-let GeneralAgent = require('./../../agents/GeneralAgent');
+let GeneralAgent = require('./../agents/GeneralAgent');
 
 const agentOptions = {
-  id: 'Filler'+uuid(),
+  id: 'Cocktail'+uuid(),
   DF: config.DF,
   transports: [
     {
       type: 'amqp',
       url: config.amqpHost
-      //host: 'dev.rabbitmq.com'
     }
   ],
   mqtt: config.mqttHost
@@ -24,19 +23,24 @@ const agentOptions = {
 
 let Agent = new GeneralAgent(agentOptions);
 
+Agent.position = 500;
 Agent.liquids = [
-  {type: 'lemonade', amount: '10000'},
-  {type: 'weissbier', amount: '500'}
+  {type: 'grenadine', amount: '10000'},
+  {type: 'lemon', amount: '10000'},
+  {type: 'maracuja', amount: '10000'},
+  {type: 'pineapple', amount: '10000'},
+  {type: 'orange', amount: '10000'},
+  {type: 'strawberry', amount: '10000'},
+  {type: 'bluecuracao', amount: '10000'},
+  {type: 'water', amount: '10000'}
 ];
 Agent.taskList = [];
 
 Agent.execute = function(){
   return new Promise( (resolve, reject) => {
-    // if position can be reached
       console.log('execute.......');
       console.log(Agent.timer.getTime());
       Agent.timer.setTimeout(resolve, 0);
-
   });
 };
 
@@ -48,15 +52,9 @@ Promise.all([Agent.ready]).then(function () {
   function checkParameters (message, context) {
     return new Promise( (resolve, reject) => {
       develop('#checkParams', message, context);
-      if(true) {
-        let offer = {price: Math.random()};
-        develop('offer:', offer);
-        resolve({propose: offer });
-      } else {
-        let msg = 'task cannot be performed.';
-        develop(msg);
-        resolve({failure: msg});
-      }
+      let offer = {price: 0.1};
+      develop('offer:', offer);
+      resolve({propose: offer });
     }).catch(console.error);
   }
 
@@ -66,15 +64,8 @@ Promise.all([Agent.ready]).then(function () {
 
       let task = {taskId: 'fill-'+uuid()};
       Agent.taskList.push(task);
-
-      if(true) {
-        develop('inform-result:', task);
-        resolve({inform: task}); // propose
-      } else {
-        let msg = 'task could not be reserved';
-        develop(msg);
-        resolve({failure: msg});
-      }
+      develop('inform-result:', task);
+      resolve({inform: task});
     }).catch(console.error);
   }
 
@@ -106,7 +97,6 @@ Promise.all([Agent.ready]).then(function () {
         _.remove(Agent.taskList, {taskId: job.taskId});
         develop('task successfully finished. removed. taskList:', Agent.taskList);
         resolve({inform: 'done'});
-
       }).catch(console.error);
     });
   }
@@ -122,6 +112,7 @@ Promise.all([Agent.ready]).then(function () {
     setTimeout(process.exit, 500); // wait for deregistering complete
   });
 
+  // nodemon-event: rs (restart)
   process.once('SIGUSR2', function () {
     Agent.deRegister();
     setTimeout(function () {
