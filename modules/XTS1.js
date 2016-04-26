@@ -11,8 +11,8 @@ const co = require('co');
 const retry = require('co-retry');
 let GeneralAgent = require('./../../agents/GeneralAgent');
 
-var agentOptions = {
-  id: 'XTS1',
+const agentOptions = {
+  id: 'HandlingRobot'+uuid(),
   DF: config.DF,
   transports: [
     {
@@ -24,22 +24,29 @@ var agentOptions = {
   mqtt: config.mqttHost
 };
 
-//TODO implement reserve/unreserve services (xts is different from handling robot, because the mover will be reserved during complete production
-var Agent = new GeneralAgent(agentOptions);
+let Agent = new GeneralAgent(agentOptions);
 
+// discrete Positions that the Handling Robot can reach
+Agent.positions = [1,5,10,15,20,30,40,50,70,80,90,99];
 Agent.taskList = [];
 
 Agent.move = function(position){
   return new Promise( (resolve, reject) => {
-    setTimeout(resolve, 500);
+    // if position can be reached
+    if ( _.indexOf(Agent.positions, position) != -1 ) {
+      console.log('!!!!!!!!!!!!!! ==== moving... 0s');
+
+      Agent.timer.setTimeout(resolve, 0);
+    } else {
+      reject({err: 'position cannot be reached'});
+    }
   });
 };
 
 Promise.all([Agent.ready]).then(function () {
   Agent.events.on('registered',console.log);
 
-  //Agent.serviceAdd('cfp-transport', Promise.reject('listener agent'));
-  Agent.skillAddCAcfpParticipant('cfp-transport', calculatePrice, reserveTransport);
+  Agent.serviceAddCAcfpParticipant('cfp-transport', calculatePrice, reserveTransport);
   Agent.register();
   function calculatePrice (message, context) {
     return new Promise((resolve, reject) => {
@@ -89,16 +96,10 @@ Promise.all([Agent.ready]).then(function () {
       console.log('task', job);
 
       co(function* () {
-        let fromPosition = yield Agent.request(job.task.from.agent, 'getPosition');
-        console.log('fromPosition', fromPosition);
-        yield Agent.move(fromPosition); // TODO here must be real position
+        yield Agent.move(10);
         yield requestGive(job.task.from.agent, job.task.from.taskId);
-
-        let toPosition = yield Agent.request(job.task.to.agent, 'getPosition');
-        console.log('toPosition', toPosition);
-        yield Agent.move(toPosition);
+        yield Agent.move(10);
         yield requestTake(job.task.to.agent, job.task.to.taskId);
-
         _.remove(Agent.taskList, {taskId: job.taskId});
         develop('task successfully finished. removed. taskList:', Agent.taskList);
         resolve({inform: 'done'});
@@ -116,12 +117,6 @@ Promise.all([Agent.ready]).then(function () {
     develop('requestTake', participant, taskId);
     return Agent.CArequest(participant, 'request-take', taskId);
   }
-
-
-
-  //co(function* (){
-  //  // Main control flow behaviour
-  //}).catch(console.error);
 
   // deRegister upon exiting
   process.on('SIGINT', function(){

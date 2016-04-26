@@ -7,11 +7,10 @@ const babble = require('babble');
 const develop = require('debug')('develop');
 const Promise = require('bluebird');
 const uuid = require('uuid-v4');
-const co = require('co');
 let GeneralAgent = require('./../../agents/GeneralAgent');
 
-var agentOptions = {
-  id: 'Cookie',
+const agentOptions = {
+  id: 'BottleInput'+uuid(),
   DF: config.DF,
   transports: [
     {
@@ -23,28 +22,17 @@ var agentOptions = {
   mqtt: config.mqttHost
 };
 
-var Agent = new GeneralAgent(agentOptions);
+let Agent = new GeneralAgent(agentOptions);
 
-// TODO check here if not better products instead of liquids
-Agent.liquids = [
-  {type: 'cookie', amount: '10000'}
+Agent.bottles = [
+  {bottleType: 'longneck', size: 300}
 ];
 Agent.taskList = [];
-
-Agent.execute = function(){
-  return new Promise( (resolve, reject) => {
-    // if position can be reached
-      console.log('execute.......');
-      setTimeout(resolve, 2000);
-
-  });
-};
 
 Promise.all([Agent.ready]).then(function () {
   Agent.events.on('registered',console.log);
 
-  Agent.skillAddCAcfpParticipant('cfp-cookie', checkParameters, reserve);
-
+  Agent.serviceAddCAcfpParticipant('cfp-bottleInput', checkParameters, reserve);
 
   function checkParameters (message, context) {
     return new Promise( (resolve, reject) => {
@@ -55,8 +43,9 @@ Promise.all([Agent.ready]).then(function () {
         develop('offer:', offer);
         resolve({propose: offer });
       } else {
-        develop('not in stock');
-        resolve({refuse: 'not in stock'});
+        let msg = 'task cannot be performed';
+        develop(msg);
+        resolve({failure: msg});
       }
     }).catch(console.error);
   }
@@ -65,15 +54,16 @@ Promise.all([Agent.ready]).then(function () {
     return new Promise( (resolve, reject) => {
       develop('#reserve', message, context);
 
-      let task = {taskId: 'fill-'+uuid()};
+      let task = {taskId: 'input-'+uuid()};
       Agent.taskList.push(task);
 
       if(true) {
         develop('inform-result:', task);
-        resolve({informDone: task}); // propose
+        resolve({inform: task}); // propose
       } else {
-        develop('book could not be fetched in stock');
-        resolve({failure: 'book could not be fetched in stock'}); // refuse
+        let msg = 'task could not be reserved';
+        develop(msg);
+        resolve({failure: msg});
       }
     }).catch(console.error);
   }
@@ -82,36 +72,12 @@ Promise.all([Agent.ready]).then(function () {
   function give(message, context){
     develop('#give', message, context);
     return new Promise((resolve, reject) => {
+      console.log('request-give: here you have it');
       resolve({inform: 'here you have it'});
     });
   }
 
-  Agent.CArequestParticipant('request-take', take);
-  function take(message, context){
-    develop('#take', message, context);
-    return new Promise((resolve, reject) => {
-      resolve({inform: 'i took it'});
-    });
-  }
-
-  Agent.CArequestParticipant('request-execute', execute);
-  function execute (objective, context) {
-    develop('#execute', objective, context);
-
-    return new Promise((resolve, reject) => {
-      co(function* () {
-        let job = _.find(Agent.taskList, {taskId: objective.taskId});
-        console.log('task', job);
-        yield Agent.execute();
-        _.remove(Agent.taskList, {taskId: job.taskId});
-        develop('task successfully finished. removed. taskList:', Agent.taskList);
-        resolve({inform: 'done'});
-
-      }).catch(console.error);
-    });
-  }
-
-  // Register Skills
+  // Register Services
   Agent.register()
     .catch(console.log);
 
