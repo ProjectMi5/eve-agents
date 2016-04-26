@@ -9,8 +9,8 @@ const Promise = require('bluebird');
 const uuid = require('uuid-v4');
 let GeneralAgent = require('./../../agents/GeneralAgent');
 
-const agentOptions = {
-  id: 'BottleOutput'+uuid(),
+var agentOptions = {
+  id: 'Output',
   DF: config.DF,
   transports: [
     {
@@ -22,8 +22,10 @@ const agentOptions = {
   mqtt: config.mqttHost
 };
 
-let Agent = new GeneralAgent(agentOptions);
+// TODO implement unreserve and other
+var Agent = new GeneralAgent(agentOptions);
 
+Agent.position = 2000;
 Agent.bottles = [
   {bottleType: '*'}
 ];
@@ -32,7 +34,9 @@ Agent.taskList = [];
 Promise.all([Agent.ready]).then(function () {
   Agent.events.on('registered',console.log);
 
-  Agent.serviceAddCAcfpParticipant('cfp-bottleOutput', checkParameters, reserve);
+  Agent.serviceAdd('getPosition', function(){ return Agent.position; });
+  Agent.skillAddCAcfpParticipant('cfp-containerOutput', checkParameters, reserve);
+
 
   function checkParameters (message, context) {
     return new Promise( (resolve, reject) => {
@@ -43,9 +47,8 @@ Promise.all([Agent.ready]).then(function () {
         develop('offer:', offer);
         resolve({propose: offer });
       } else {
-        let msg = 'task cannot be performed';
-        develop(msg);
-        resolve({failure: msg});
+        develop('not in stock');
+        resolve({refuse: 'not in stock'});
       }
     }).catch(console.error);
   }
@@ -59,11 +62,10 @@ Promise.all([Agent.ready]).then(function () {
 
       if(true) {
         develop('inform-result:', task);
-        resolve({inform: task}); // propose
+        resolve({informDone: task}); // propose
       } else {
-        let msg = 'task could not be reserved';
-        develop(msg);
-        resolve({failure: msg});
+        develop('book could not be fetched in stock');
+        resolve({failure: 'book could not be fetched in stock'}); // refuse
       }
     }).catch(console.error);
   }
@@ -72,12 +74,11 @@ Promise.all([Agent.ready]).then(function () {
   function take(message, context){
     develop('#take', message, context);
     return new Promise((resolve, reject) => {
-      console.log('request-take',{inform: 'i took it'});
       resolve({inform: 'i took it'});
     });
   }
 
-  // Register Services
+  // Register Skills
   Agent.register()
     .catch(console.log);
 
