@@ -1,4 +1,4 @@
-process.env.DEBUG = 'time,develop,verbose';
+process.env.DEBUG = 'develop,error,production';
 
 var config = {};
 

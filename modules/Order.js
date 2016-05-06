@@ -7,10 +7,11 @@ const error = require('debug')('error');
 const production = require('debug')('production');
 
 const _ = require('lodash');
+const co = require('co');
 const babble = require('babble');
 const Promise = require('bluebird');
 const uuid = require('uuid-v4');
-let GeneralAgent = require('./../agents/GeneralAgent');
+const GeneralAgent = require('./../agents/GeneralAgent');
 
 const agentOptions = {
   id: 'Order'+uuid(),
@@ -45,8 +46,11 @@ Promise.all([Agent.ready]).then(function () {
   Agent.serviceAdd('process-orders', '');
   Agent.register();
 
-  Agent.searchAndSelectServiceBy('negotiate', recipe, 'price')
-    .then(develop);
+  co(function* (){
+    let selectedNegotiator = yield Agent.searchAndSelectServiceBy('negotiate', recipe, 'price');
+    let result = yield Agent.CArequest(selectedNegotiator.agent, 'execute', selectedNegotiator.taskId);
+    console.log(result);
+  });
 
 
   // deRegister upon exiting

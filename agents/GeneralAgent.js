@@ -258,27 +258,21 @@ Agent.prototype.CAcfpAcceptProposalListener = function (conversation, doAccept) 
 Agent.prototype.searchAndSelectServiceBy = function(service, objective, criteria) {
   let self = this;
 
-  return self.searchService(service)
-    .then((agents)=>{
-      return Promise.all(agents.map(function(agent){
-        return self.CAcfp(agent.agent, service, objective);
-      }));
-    })
-    .then((propositions)=>{
-      return Promise.resolve( _.minBy(propositions, criteria));
-    })
-    .then((selectedProposition)=>{
-      develop(selectedProposition);
-      return self.CAcfpAcceptProposal(selectedProposition.agent, service, objective);
-    })
-    .then((reply)=>{
-      if(reply.inform) {
-        return Promise.resolve(reply.inform.taskId);
-      } else {
-        throw new Error('failure in reservation', reply);
-      }
-    })
-    .catch(error);
+  return co(function* () {
+    let agents = yield self.searchService(service);
+    let propositions = yield Promise.all(agents.map(function(agent){
+      return self.CAcfp(agent.agent, service, objective);
+    }));
+    let selectedProposition =  _.minBy(propositions, criteria);
+    develop('selectedProposition', selectedProposition);
+    let reply = yield self.CAcfpAcceptProposal(selectedProposition.agent, service, objective);
+    if(reply.inform) {
+      let ret = {agent: selectedProposition.agent, taskId: reply.inform.taskId};
+      return yield Promise.resolve(ret);
+    } else {
+      throw new Error('failure in reservation', reply);
+    }
+  }).catch(error);
 };
 
 /**
