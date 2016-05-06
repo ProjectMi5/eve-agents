@@ -1,7 +1,9 @@
 "use strict";
 
 const develop = require('debug')('develop');
-const _ = require('underscore');
+const error = require('debug')('error');
+
+const _ = require('lodash');
 const Promise = require('bluebird');
 let co = require('co');
 let eve = require('evejs');
@@ -73,7 +75,7 @@ Agent.prototype.register = function(){
   var self = this;
   return this.request(this.DF, 'register', {services: this.services})
     .then(function(reply){
-      console.log(reply);
+      develop(reply);
       if(reply.err) throw new Error('#register could not be performed: ' + reply.err);
       else if (_.isEmpty(reply)){
         throw new Error('#register could not be performed. DF not reachable? ' + reply.err);
@@ -121,11 +123,12 @@ Agent.prototype.searchService = function(service){
  * @returns {*|Promise.<T>}
  */
 Agent.prototype.request = function(to, method, params) {
-  this.sendToSniffer({to: to, from: this.id, type: 'rpc', method: method, params: params});
+  let sniffing = {to: to, from: this.id, type: 'rpc', method: method, params: params};
+  this.sendToSniffer(sniffing);
+  develop(sniffing);
 
   return this.rpc.request(to, {method: method, params: params})
     .then(function(reply){
-      develop('#request ', to, method, params);
       return Promise.resolve(reply);
     })
     .catch(function(err){
@@ -138,8 +141,9 @@ Agent.prototype.request = function(to, method, params) {
 // Communicative Acts ===================================================
 // cfp
 Agent.prototype.CAcfp = function(participant, conversation, objective){
-  console.log('CAcfp', participant);
-  this.sendToSniffer({to: participant, from: this.id, type: 'CAcfp', conversation: conversation, objective: objective});
+  let sniffing = {to: participant, from: this.id, type: 'CAcfp', conversation: conversation, objective: objective};
+  develop(sniffing);
+  this.sendToSniffer(sniffing);
 
   return new Promise( (resolve, reject) => {
     this.tell(participant, conversation)
@@ -152,7 +156,7 @@ Agent.prototype.CAcfp = function(participant, conversation, objective){
       })
       .tell(function (message, context) {
         if (message.propose) {
-          develop('propsed:', message);
+          develop('proposed:', message);
           let ret = message.propose;
           ret.agent = context.from; //add seller name to propositions
           resolve(ret);
@@ -170,10 +174,11 @@ Agent.prototype.CAcfp = function(participant, conversation, objective){
 };
 
 Agent.prototype.CAcfpAcceptProposal = function(seller, conversation, objective){
-  console.log('CAcfpAcceptProposal', seller);
   let conv = conversation + '-accept';
 
-  this.sendToSniffer({to: seller, from: this.id, type: 'CAcfpAcceptProposal', conversation: conversation, objective: objective});
+  let sniffing = {to: seller, from: this.id, type: 'CAcfpAcceptProposal', conversation: conversation, objective: objective};
+  develop(sniffing);
+  this.sendToSniffer(sniffing);
 
   return new Promise( (resolve, reject) => {
     this.tell(seller, conv)
@@ -200,7 +205,9 @@ Agent.prototype.CAcfpListener = function (conversation, doTell){
       // Hook into the promise chain
       return doTell(message, context)
         .then(function(reply) {
-          self.sendToSniffer({from: self.id, to: context.from, type: 'CAcfpListener', message: reply});
+          let sniffing = {from: self.id, to: context.from, type: 'CAcfpListener', message: reply};
+          develop(sniffing);
+          self.sendToSniffer(sniffing);
           return reply;
         });
     } else {
@@ -210,7 +217,8 @@ Agent.prototype.CAcfpListener = function (conversation, doTell){
 
   this.listen(conversation)
     .listen(function (message, context) { // cfp (book-title)
-      develop('CAcfpListener:', message);
+      let sniffing = {from: self.id, to: context.from, type: 'CAcfpListener', message: message};
+      develop(sniffing);
       return message;
     })
     .tell(cb);
@@ -246,10 +254,37 @@ Agent.prototype.CAcfpAcceptProposalListener = function (conversation, doAccept) 
     .tell(cb);
 };
 
+
+Agent.prototype.searchAndSelectServiceBy = function(service, objective, criteria) {
+  let self = this;
+
+  return self.searchService(service)
+    .then((agents)=>{
+      return Promise.all(agents.map(function(agent){
+        return self.CAcfp(agent.agent, service, objective);
+      }));
+    })
+    .then((propositions)=>{
+      return Promise.resolve( _.minBy(propositions, criteria));
+    })
+    .then((selectedProposition)=>{
+      develop(selectedProposition);
+      return self.CAcfpAcceptProposal(selectedProposition.agent, service, objective);
+    })
+    .then((reply)=>{
+      if(reply.inform) {
+        return Promise.resolve(reply.inform.taskId);
+      } else {
+        throw new Error('failure in reservation', reply);
+      }
+    })
+    .catch(error);
+};
+
 /**
  *
  * @param conversation
- * @param cfpListener function(message, context)
+ * @param cfpListener function(message, context) return Promise(resolve({propose: / failure: }););
  * @param acceptListener function(message, context)
  */
 Agent.prototype.serviceAddCAcfpParticipant = function(conversation, cfpListener, acceptListener) {

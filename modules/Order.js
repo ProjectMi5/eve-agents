@@ -45,29 +45,6 @@ Promise.all([Agent.ready]).then(function () {
   Agent.serviceAdd('process-orders', '');
   Agent.register();
 
-  Agent.searchAndSelectServiceBy = function(service, objective, criteria) {
-    return Agent.searchService(service)
-      .then((agents)=>{
-        return Promise.all(agents.map(function(agent){
-          return Agent.CAcfp(agent.agent, service, objective);
-        }));
-      })
-      .then((propositions)=>{
-        return Promise.resolve( _.minBy(propositions, criteria));
-      })
-      .then((selectedProposition)=>{
-        develop(selectedProposition);
-        return Agent.CAcfpAcceptProposal(selectedProposition.agent, service, objective);
-      })
-      .then((reply)=>{
-        if(reply.inform) {
-          return Promise.resolve(reply.inform.taskId);
-        } else {
-          throw new Error('failure in reservation', reply);
-        }
-      })
-      .catch(error);
-  };
   Agent.searchAndSelectServiceBy('negotiate', recipe, 'price')
     .then(develop);
 
